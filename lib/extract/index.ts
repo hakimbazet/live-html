@@ -119,3 +119,4 @@ function assembleFields(
 }
 
 export { isElement };
+export { mapScriptFields } from "./script-fields";

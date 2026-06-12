@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Live HTML
 
-## Getting Started
+Turn a static, AI-generated HTML dashboard into a **live, editable** one. Upload a
+single self-contained HTML artifact (the kind Claude and other AI tools produce —
+inline CSS/JS, Chart.js charts, KPI cards, tables) and the app extracts every piece
+of data into an intuitive, grouped table. Edit a value and the rendered dashboard
+updates instantly in a side-by-side preview. Download the updated HTML when you're done.
 
-First, run the development server:
+## How it works
+
+- **Deterministic DOM extraction** — every visible text node, plus `img src` / `img alt`
+  and `a href` attributes, is extracted client-side with [`parse5`](https://github.com/inikulin/parse5)
+  using source-location info. Each field is addressed by its exact byte offset in the
+  original HTML, so edits are applied by precise string splicing — the exported file is
+  byte-identical to the original everywhere you didn't edit.
+- **LLM chart-data extraction** — data inside inline `<script>` tags (Chart.js datasets,
+  labels, titles) is too unstructured for a parser, so it's read by Claude. The model
+  returns each editable value plus a unique anchor snippet; the client maps those back to
+  verified byte offsets and drops anything it can't locate exactly. Results are cached by
+  script-content hash, so a refresh never re-calls the API.
+- **Live preview** — a sandboxed `<iframe srcDoc>` re-renders (and re-runs Chart.js) on a
+  short debounce after each edit.
+- **Persistence** — your document and edits auto-save to `localStorage`; "Download HTML"
+  exports the edited file.
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local   # add your ANTHROPIC_API_KEY for chart-data editing
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 and drop an HTML dashboard onto the page. A sample lives at
+`fixtures/sample-dashboard.html`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> The `ANTHROPIC_API_KEY` is **optional**. Without it, all text, image, and link editing
+> works as normal — only the "Chart Data" tab (which reads values out of inline scripts)
+> is disabled, with an explanatory message.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+| Command | Description |
+| --- | --- |
+| `pnpm dev` | Start the dev server |
+| `pnpm build` | Production build |
+| `pnpm test` | Run the unit tests (Vitest) |
+| `pnpm lint` | Lint |
 
-To learn more about Next.js, take a look at the following resources:
+## Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next.js (App Router) · Tailwind CSS v4 · shadcn/ui · parse5 · `@anthropic-ai/sdk`
