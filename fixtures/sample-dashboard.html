@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Quarterly Sales Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f4f1ea; color: #222; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 32px; }
+    h1 { margin: 0 0 4px; }
+    .subtitle { color: #666; margin: 0 0 24px; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .card .label { font-size: 13px; color: #888; }
+    .card .value { font-size: 28px; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; }
+    .logo { height: 40px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <img class="logo" src="https://example.com/logo.png" alt="Acme logo" />
+      <h1>Quarterly Sales Dashboard</h1>
+      <p class="subtitle">Fiscal year 2024 performance overview</p>
+    </header>
+
+    <section class="kpis" aria-label="Key Metrics">
+      <div class="card">
+        <div class="label">Total Revenue</div>
+        <div class="value">$1.24M</div>
+      </div>
+      <div class="card">
+        <div class="label">New Customers</div>
+        <div class="value">348</div>
+      </div>
+      <div class="card">
+        <div class="label">Churn Rate</div>
+        <div class="value">2.1%</div>
+      </div>
+      <div class="card">
+        <div class="label">Avg Deal Size</div>
+        <div class="value">$3.6K</div>
+      </div>
+    </section>
+
+    <section aria-label="Revenue by Quarter">
+      <h2>Revenue by Quarter</h2>
+      <table>
+        <thead>
+          <tr><th>Quarter</th><th>Revenue</th><th>Deals</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Q1</td><td>$280K</td><td>92</td></tr>
+          <tr><td>Q2</td><td>$310K</td><td>104</td></tr>
+          <tr><td>Q3</td><td>$340K</td><td>118</td></tr>
+          <tr><td>Q4</td><td>$310K</td><td>99</td></tr>
+        </tbody>
+      </table>
+      <p><a href="https://example.com/report">View full report</a></p>
+    </section>
+
+    <section aria-label="Revenue Chart">
+      <h2>Quarterly Revenue</h2>
+      <canvas id="revenueChart" width="600" height="240"></canvas>
+    </section>
+  </div>
+
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" alt="spacer" />
+
+  <script>
+    const ctx = document.getElementById('revenueChart');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+        datasets: [
+          { label: 'Revenue 2024', data: [280, 310, 340, 310.5] },
+          { label: 'Revenue 2023', data: [240, 250, 268, 275] }
+        ]
+      },
+      options: {
+        plugins: { title: { display: true, text: 'Quarterly Revenue' } }
+      }
+    });
+  </script>
+</body>
+</html>
