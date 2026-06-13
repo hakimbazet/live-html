@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, FileJson, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileJson, Loader2, Plus, Save, Trash2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { hydrate } from "@/lib/loader";
 import { downloadText, slugify } from "@/lib/download";
@@ -13,8 +13,24 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type Cell = string | number | boolean | null;
+
+interface MergeProposal {
+  type: "kpi" | "label";
+  canonical: string;
+  duplicates: string[];
+  reason: string;
+  value: string;
+}
 
 /** Preserve a cell's numeric-ness: if it started numeric and the new text is a
  *  finite number, keep it a number so the loader's formatter still applies. */
@@ -33,6 +49,10 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editedKpis, setEditedKpis] = useState<Set<string>>(new Set());
+  const [optimizing, setOptimizing] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [proposal, setProposal] = useState<MergeProposal[] | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     let alive = true;
@@ -80,6 +100,59 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     }
   }, [data, id]);
 
+  const runOptimize = useCallback(async () => {
+    if (!data) return;
+    setOptimizing(true);
+    try {
+      const res = await fetch(`/api/dashboards/${id}/optimize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message ?? "Optimization failed.");
+      const groups = (json.groups ?? []) as MergeProposal[];
+      if (groups.length === 0) {
+        toast.success("No duplicate values found — JSON already looks tidy.");
+        return;
+      }
+      setProposal(groups);
+      setSelected(new Set(groups.map((_, i) => i)));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Optimization failed.");
+    } finally {
+      setOptimizing(false);
+    }
+  }, [data, id]);
+
+  const applyOptimize = useCallback(async () => {
+    if (!data || !proposal) return;
+    const groups = proposal.filter((_, i) => selected.has(i));
+    if (groups.length === 0) {
+      setProposal(null);
+      return;
+    }
+    setApplying(true);
+    try {
+      const res = await fetch(`/api/dashboards/${id}/optimize`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data, groups }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.issues?.join("; ") ?? json.message ?? "Apply failed.");
+      setTemplate(json.template);
+      setData(json.data);
+      setDirty(false);
+      setProposal(null);
+      toast.success(`Merged ${json.removed} duplicate value${json.removed === 1 ? "" : "s"}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Apply failed.");
+    } finally {
+      setApplying(false);
+    }
+  }, [data, id, proposal, selected]);
+
   if (error) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4">
@@ -121,6 +194,16 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           {dirty && <Badge variant="secondary">unsaved</Badge>}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={optimizing}
+            onClick={runOptimize}
+            title="Use the LLM to find duplicate values to merge, then review before applying"
+          >
+            {optimizing ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+            Optimize
+          </Button>
           <Button variant="outline" size="sm" onClick={downloadHtml} title="Download the generated standalone HTML">
             <Download className="size-4" /> HTML
           </Button>
@@ -272,6 +355,64 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           />
         </div>
       </div>
+
+      <Dialog open={proposal !== null} onOpenChange={(o) => !o && setProposal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Review duplicate merges</DialogTitle>
+            <DialogDescription>
+              These keyed values look like the same fact under different keys. Applying
+              keeps one entry and rewires every binding to it — so one edit updates all
+              of them. Uncheck any you want to leave separate.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-72 space-y-2 overflow-y-auto">
+            {(proposal ?? []).map((g, i) => (
+              <label
+                key={i}
+                className="hover:bg-muted/50 flex cursor-pointer items-start gap-3 rounded-md border p-3"
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4"
+                  checked={selected.has(i)}
+                  onChange={(e) =>
+                    setSelected((s) => {
+                      const next = new Set(s);
+                      if (e.target.checked) next.add(i);
+                      else next.delete(i);
+                      return next;
+                    })
+                  }
+                />
+                <div className="min-w-0 space-y-1 text-sm">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant="outline" className="font-mono">
+                      {g.type}
+                    </Badge>
+                    <span className="font-mono text-xs">{g.canonical}</span>
+                    {g.value && <span className="text-muted-foreground">= {g.value}</span>}
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    merges{" "}
+                    <span className="font-mono">{g.duplicates.join(", ")}</span>
+                    {g.reason ? ` — ${g.reason}` : ""}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setProposal(null)} disabled={applying}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={applyOptimize} disabled={applying || selected.size === 0}>
+              {applying ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+              Apply {selected.size > 0 ? `(${selected.size})` : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

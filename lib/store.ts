@@ -105,6 +105,21 @@ export async function setStatus(id: string, status: DashboardStatus): Promise<vo
   await touchMeta(id, { status });
 }
 
+/** Persist a rewired template + data together (e.g. after JSON optimization). */
+export async function saveTemplateAndData(
+  id: string,
+  template: string,
+  data: DashboardData
+): Promise<void> {
+  const d = dir(id);
+  const validated = DataSchema.parse(data);
+  await Promise.all([
+    fs.writeFile(path.join(d, "template.html"), template, "utf8"),
+    fs.writeFile(path.join(d, "data.json"), JSON.stringify(validated, null, 2), "utf8"),
+  ]);
+  await touchMeta(id, {});
+}
+
 async function touchMeta(id: string, patch: Partial<DashboardMeta>): Promise<void> {
   const p = path.join(dir(id), "meta.json");
   const raw = await readIfExists(p);

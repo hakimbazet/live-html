@@ -31,6 +31,14 @@ buttons just save them (current editor state included) to your machine.
 **Gallery** (`/gallery`) lists every saved dashboard with a live thumbnail, status,
 date and migration cost, and links straight into verify or edit.
 
+**Optimize** (editor) is an optional second LLM pass that finds keyed scalar values
+(KPIs / labels) stored under different keys but representing the same fact, and
+proposes merging them. The LLM only *suggests* groupings; merging is applied
+**deterministically** (`lib/optimize.ts`) — it rewires every `data-bind` to the
+canonical key, drops the duplicate entries, and re-runs the full sanity suite before
+persisting. You review and tick the proposed merges before anything is applied, so a
+wrong suggestion can't silently change two places at once.
+
 ## Why a migration call, not a parser
 
 The model holds a strict "don't touch anything you don't have to" constraint and
