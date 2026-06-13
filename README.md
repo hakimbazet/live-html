@@ -22,9 +22,11 @@ spreadsheet-like editor lets you change a value and watch the preview update liv
    **Approve** freezes the migration; **Reject** sends it back. A **fix assistant**
    chat bubble (multimodal — attach screenshots) is scoped strictly to these two
    documents: ask it about a visual difference and it proposes a corrected template
-   you **Apply**, which is re-run through the sanity suite before saving (a fix that
-   drops a marker or rewrites the document is rejected, never persisted). Its model
-   is set by `DEEPSEEK_CHAT_MODEL` (default `deepseek-v4-flash`).
+   — and, when the fix needs it, a corrected `data.json` too — which you **Apply**.
+   The pair is re-run through the sanity suite before saving, so template markers
+   and data keys can't drift apart (a fix that drops a marker, orphans a key, or
+   rewrites the document is rejected, never persisted). Its model is set by
+   `DEEPSEEK_CHAT_MODEL` (default `deepseek-v4-flash`).
 3. **Edit** (`/editor/[id]`) — tabs for KPIs · each chart · each table · Narrative ·
    Labels, with a live preview. Save writes `data.json` and re-hydrates.
 

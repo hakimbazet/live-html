@@ -3,6 +3,7 @@ import type OpenAI from "openai";
 import { getDeepseek, CHAT_MODEL, CHAT_MAX_TOKENS, hasDeepseekKey, withBackoff } from "@/lib/deepseek";
 import { buildChatSystem, parseChatReply } from "@/lib/chat-prompt";
 import { runSanityChecks } from "@/lib/sanity";
+import { DataSchema } from "@/lib/schema";
 import { hydrate } from "@/lib/loader";
 import { loadDashboard, saveTemplateAndData } from "@/lib/store";
 
@@ -43,7 +44,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: buildChatSystem(record.originalHtml, record.template) },
+    {
+      role: "system",
+      content: buildChatSystem(
+        record.originalHtml,
+        record.template,
+        JSON.stringify(record.data, null, 2)
+      ),
+    },
   ];
   for (const t of turns) {
     if (t.role === "assistant") {
@@ -70,8 +78,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       })
     );
     const content = res.choices[0]?.message?.content ?? "";
-    const { reply, proposedTemplate } = parseChatReply(content);
-    return NextResponse.json({ reply, proposedTemplate });
+    const { reply, proposedTemplate, proposedData } = parseChatReply(content);
+    return NextResponse.json({ reply, proposedTemplate, proposedData });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Chat failed.";
     return NextResponse.json({ error: "chat_failed", message }, { status: 502 });
@@ -79,10 +87,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 }
 
 interface ApplyBody {
-  template: string;
+  template?: string;
+  /** Optional corrected data.json (object or raw JSON string). */
+  data?: unknown;
 }
 
-/** PUT: apply a proposed template fix — sanity-check against current data, save. */
+/**
+ * PUT: apply a proposed fix. Template and/or data may change — whichever the
+ * chat returned; the other falls back to the stored value. The resulting pair
+ * is re-run through the full sanity suite (so template markers and data keys
+ * must stay in sync) and persisted only if it passes.
+ */
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const record = await loadDashboard(id);
@@ -94,14 +109,44 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   } catch {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
-  const template = typeof body.template === "string" ? body.template : "";
-  if (!template.trim()) {
-    return NextResponse.json({ error: "bad_request", message: "Missing template." }, { status: 400 });
+
+  const hasTemplate = typeof body.template === "string" && body.template.trim().length > 0;
+  const hasData = body.data !== undefined && body.data !== null;
+  if (!hasTemplate && !hasData) {
+    return NextResponse.json(
+      { error: "bad_request", message: "Nothing to apply." },
+      { status: 400 }
+    );
   }
 
-  // Re-validate the fixed template against the existing data — the chat must
-  // not have dropped markers, orphaned keys, or rewritten the whole document.
-  const check = runSanityChecks(record.originalHtml, template, JSON.stringify(record.data));
+  const template = hasTemplate ? (body.template as string) : record.template;
+
+  let data = record.data;
+  if (hasData) {
+    let json: unknown = body.data;
+    if (typeof json === "string") {
+      try {
+        json = JSON.parse(json);
+      } catch {
+        return NextResponse.json(
+          { error: "invalid_data", issues: ["proposed data.json is not valid JSON"] },
+          { status: 422 }
+        );
+      }
+    }
+    const parsed = DataSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "invalid_data", issues: parsed.error.issues.map((i) => i.message) },
+        { status: 422 }
+      );
+    }
+    data = parsed.data;
+  }
+
+  // Re-validate the resulting pair — the chat must not have dropped markers,
+  // orphaned keys in either direction, or rewritten the whole document.
+  const check = runSanityChecks(record.originalHtml, template, JSON.stringify(data));
   if (check.issues.length) {
     return NextResponse.json(
       { error: "apply_failed", message: "Proposed fix failed sanity checks.", issues: check.issues },
@@ -109,9 +154,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     );
   }
 
-  await saveTemplateAndData(id, template, record.data);
+  await saveTemplateAndData(id, template, data);
   return NextResponse.json({
-    hydrated: hydrate(template, record.data),
+    hydrated: hydrate(template, data),
     template,
+    data,
   });
 }

@@ -12,6 +12,7 @@ interface ChatMsg {
   text: string;
   images?: string[];
   proposedTemplate?: string;
+  proposedData?: string;
   applied?: boolean;
 }
 
@@ -80,7 +81,12 @@ export function VerifyChat({
       if (!res.ok) throw new Error(json.message ?? "Chat failed.");
       setMessages((m) => [
         ...m,
-        { role: "assistant", text: json.reply ?? "", proposedTemplate: json.proposedTemplate },
+        {
+          role: "assistant",
+          text: json.reply ?? "",
+          proposedTemplate: json.proposedTemplate,
+          proposedData: json.proposedData,
+        },
       ]);
     } catch (e) {
       setMessages((m) => [
@@ -94,13 +100,13 @@ export function VerifyChat({
 
   const applyFix = async (idx: number) => {
     const msg = messages[idx];
-    if (!msg.proposedTemplate) return;
+    if (!msg.proposedTemplate && !msg.proposedData) return;
     setApplyingIdx(idx);
     try {
       const res = await fetch(`/api/dashboards/${id}/chat`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template: msg.proposedTemplate }),
+        body: JSON.stringify({ template: msg.proposedTemplate, data: msg.proposedData }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.issues?.join("; ") ?? json.message ?? "Apply failed.");
@@ -174,7 +180,7 @@ export function VerifyChat({
                 ))}
               </div>
             )}
-            {m.role === "assistant" && m.proposedTemplate && (
+            {m.role === "assistant" && (m.proposedTemplate || m.proposedData) && (
               <Button
                 size="sm"
                 variant={m.applied ? "secondary" : "default"}
@@ -188,7 +194,11 @@ export function VerifyChat({
                 ) : (
                   <Wand2 className="size-4" />
                 )}
-                {m.applied ? "Applied" : "Apply fix"}
+                {m.applied
+                  ? "Applied"
+                  : m.proposedData
+                    ? "Apply fix (updates data)"
+                    : "Apply fix"}
               </Button>
             )}
           </div>
