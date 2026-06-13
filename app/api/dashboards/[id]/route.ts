@@ -6,7 +6,7 @@ import { loadDashboard, saveData, setStatus } from "@/lib/store";
 export const runtime = "nodejs";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -14,12 +14,17 @@ export async function GET(
   if (!record) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
+  const hydrated = hydrate(record.template, record.data);
+  // Gallery thumbnails only need the rendered HTML — skip the heavier payload.
+  if (new URL(req.url).searchParams.get("view") === "preview") {
+    return NextResponse.json({ meta: record.meta, hydrated });
+  }
   return NextResponse.json({
     meta: record.meta,
     originalHtml: record.originalHtml,
     template: record.template,
     data: record.data,
-    hydrated: hydrate(record.template, record.data),
+    hydrated,
   });
 }
 

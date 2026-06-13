@@ -141,7 +141,7 @@ function Thumb({ id }: { id: string }) {
   const [html, setHtml] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
-    fetch(`/api/dashboards/${id}`)
+    fetch(`/api/dashboards/${id}?view=preview`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => alive && j && setHtml(j.hydrated))
       .catch(() => {});

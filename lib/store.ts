@@ -135,10 +135,13 @@ export async function listDashboards(): Promise<DashboardMeta[]> {
   } catch {
     return [];
   }
-  const metas: DashboardMeta[] = [];
-  for (const id of ids) {
-    const raw = await readIfExists(path.join(DATA_DIR, id, "meta.json"));
-    if (raw) metas.push(JSON.parse(raw) as DashboardMeta);
-  }
-  return metas.sort((a, b) => b.createdAt - a.createdAt);
+  const metas = await Promise.all(
+    ids.map(async (id) => {
+      const raw = await readIfExists(path.join(DATA_DIR, id, "meta.json"));
+      return raw ? (JSON.parse(raw) as DashboardMeta) : null;
+    })
+  );
+  return metas
+    .filter((m): m is DashboardMeta => m !== null)
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
