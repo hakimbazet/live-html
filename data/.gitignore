@@ -1,0 +1,3 @@
+# Generated dashboards are runtime artifacts — keep the folder, ignore contents.
+*
+!.gitignore
