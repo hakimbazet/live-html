@@ -28,6 +28,9 @@ hydrated file) and **Download JSON** (the `data.json` that produced it). The ser
 already keeps both — plus `original.html` and `meta.json` — under `data/{id}/`; the
 buttons just save them (current editor state included) to your machine.
 
+**Gallery** (`/gallery`) lists every saved dashboard with a live thumbnail, status,
+date and migration cost, and links straight into verify or edit.
+
 ## Why a migration call, not a parser
 
 The model holds a strict "don't touch anything you don't have to" constraint and

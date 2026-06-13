@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileUp, Loader2, Sparkles, AlertTriangle, Check } from "lucide-react";
+import { FileUp, Loader2, Sparkles, AlertTriangle, Check, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 import { validateHtml } from "@/lib/validate-html";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 type Phase = "idle" | "migrating";
 
@@ -131,6 +132,11 @@ export default function Home() {
             design-only <code>template</code> and an editable <code>data.json</code>, with
             zero visual change — then verify and edit it live.
           </p>
+          <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
+            <Link href="/gallery">
+              <LayoutGrid className="size-4" /> View saved work
+            </Link>
+          </Button>
         </div>
 
         <Card
