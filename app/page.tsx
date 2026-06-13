@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileUp, Loader2, Sparkles, AlertTriangle } from "lucide-react";
+import { FileUp, Loader2, Sparkles, AlertTriangle, Check } from "lucide-react";
 import { toast } from "sonner";
 import { validateHtml } from "@/lib/validate-html";
 import { Button } from "@/components/ui/button";
@@ -11,13 +11,31 @@ import { cn } from "@/lib/utils";
 
 type Phase = "idle" | "migrating";
 
+type Event =
+  | { type: "status"; message: string }
+  | { type: "progress"; phase: string; chars: number }
+  | { type: "done"; id: string; costUsd: number }
+  | { type: "error"; message: string; issues?: string[] };
+
+interface LogLine {
+  message: string;
+  done?: boolean;
+}
+
 export default function Home() {
   const router = useRouter();
   const [dragging, setDragging] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
+  const [log, setLog] = useState<LogLine[]>([]);
+  const [progress, setProgress] = useState<{ phase: string; chars: number } | null>(null);
   const [issues, setIssues] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const logEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ block: "end" });
+  }, [log, progress]);
 
   const migrate = useCallback(
     async (file: File | undefined) => {
@@ -30,27 +48,65 @@ export default function Home() {
       }
 
       setPhase("migrating");
+      setLog([]);
+      setProgress(null);
       setIssues([]);
       setError(null);
+
       try {
         const res = await fetch("/api/migrate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ html: text, fileName: file.name }),
         });
-        const json = await res.json();
-        if (!res.ok) {
+
+        // Pre-stream failures (no API key, bad request) come back as JSON.
+        if (!res.ok || !res.body) {
+          const json = await res.json().catch(() => ({}));
           setError(json.message ?? "Migration failed.");
           setIssues(json.issues ?? []);
           setPhase("idle");
           return;
         }
-        toast.success(
-          json.costUsd
-            ? `Migrated (~$${json.costUsd.toFixed(4)}). Review the result.`
-            : "Migrated. Review the result."
-        );
-        router.push(`/verify/${json.id}`);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+
+        const handle = (e: Event) => {
+          if (e.type === "status") {
+            setProgress(null);
+            setLog((l) => [...l, { message: e.message }]);
+          } else if (e.type === "progress") {
+            setProgress({ phase: e.phase, chars: e.chars });
+          } else if (e.type === "done") {
+            setProgress(null);
+            setLog((l) => [...l, { message: "Done — opening verification.", done: true }]);
+            toast.success(
+              e.costUsd
+                ? `Migrated (~$${e.costUsd.toFixed(4)}).`
+                : "Migrated."
+            );
+            router.push(`/verify/${e.id}`);
+          } else if (e.type === "error") {
+            setError(e.message);
+            setIssues(e.issues ?? []);
+            setPhase("idle");
+          }
+        };
+
+        // Read newline-delimited JSON events.
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let nl: number;
+          while ((nl = buf.indexOf("\n")) !== -1) {
+            const line = buf.slice(0, nl).trim();
+            buf = buf.slice(nl + 1);
+            if (line) handle(JSON.parse(line) as Event);
+          }
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Migration failed.");
         setPhase("idle");
@@ -60,6 +116,7 @@ export default function Home() {
   );
 
   const busy = phase === "migrating";
+  const showLog = busy || log.length > 0;
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-16">
@@ -128,6 +185,36 @@ export default function Home() {
             onChange={(e) => migrate(e.target.files?.[0])}
           />
         </Card>
+
+        {showLog && (
+          <Card className="bg-muted/30 p-0">
+            <div className="text-muted-foreground border-b px-3 py-1.5 font-mono text-xs">
+              migration log
+            </div>
+            <div className="max-h-48 space-y-1 overflow-y-auto px-3 py-2 font-mono text-xs">
+              {log.map((line, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  {line.done ? (
+                    <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+                  ) : (
+                    <span className="text-muted-foreground shrink-0 select-none">›</span>
+                  )}
+                  <span className={cn(line.done && "text-emerald-700")}>{line.message}</span>
+                </div>
+              ))}
+              {progress && (
+                <div className="text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                  <span>
+                    {progress.phase === "repairing" ? "repairing" : "receiving output"} —{" "}
+                    {progress.chars.toLocaleString()} chars
+                  </span>
+                </div>
+              )}
+              <div ref={logEndRef} />
+            </div>
+          </Card>
+        )}
 
         {error && (
           <Card className="border-destructive/40 bg-destructive/5 space-y-2 p-4">
