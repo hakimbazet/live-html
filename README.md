@@ -19,7 +19,12 @@ spreadsheet-like editor lets you change a value and watch the preview update liv
    DeepSeek call, runs deterministic sanity checks, retries once with the issue list
    if needed, and (only on success) writes `data/{id}/`.
 2. **Verify** (`/verify/[id]`) — original vs. hydrated template, side-by-side.
-   **Approve** freezes the migration; **Reject** sends it back.
+   **Approve** freezes the migration; **Reject** sends it back. A **fix assistant**
+   chat bubble (multimodal — attach screenshots) is scoped strictly to these two
+   documents: ask it about a visual difference and it proposes a corrected template
+   you **Apply**, which is re-run through the sanity suite before saving (a fix that
+   drops a marker or rewrites the document is rejected, never persisted). Its model
+   is set by `DEEPSEEK_CHAT_MODEL` (default `deepseek-v4-flash`).
 3. **Edit** (`/editor/[id]`) — tabs for KPIs · each chart · each table · Narrative ·
    Labels, with a live preview. Save writes `data.json` and re-hydrates.
 

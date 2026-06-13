@@ -24,6 +24,11 @@ export function getDeepseek(): OpenAI {
 export const MODEL = process.env.DEEPSEEK_MODEL ?? "deepseek-v4-flash";
 export const MAX_TOKENS = Number(process.env.DEEPSEEK_MAX_TOKENS ?? 32000);
 
+// Multimodal chat assistant on the verify screen (accepts screenshots). Kept as
+// its own env var so it can use a vision-capable model independent of migration.
+export const CHAT_MODEL = process.env.DEEPSEEK_CHAT_MODEL ?? "deepseek-v4-flash";
+export const CHAT_MAX_TOKENS = Number(process.env.DEEPSEEK_CHAT_MAX_TOKENS ?? 8000);
+
 export function hasDeepseekKey(): boolean {
   return Boolean(process.env.DEEPSEEK_API_KEY);
 }
