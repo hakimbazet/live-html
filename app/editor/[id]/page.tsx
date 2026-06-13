@@ -2,9 +2,10 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileJson, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { hydrate } from "@/lib/loader";
+import { downloadText, slugify } from "@/lib/download";
 import type { DashboardData, Sheet } from "@/lib/schema";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   const chartKeys = Object.keys(data.charts);
   const tableKeys = Object.keys(data.tables);
+  const base = slugify(data.meta.title || data.meta.sourceFile || "dashboard");
+  const downloadHtml = () =>
+    downloadText(`${base}.html`, hydrate(template, data), "text/html");
+  const downloadJson = () =>
+    downloadText(`${base}.json`, JSON.stringify(data, null, 2), "application/json");
 
   return (
     <main className="flex flex-1 flex-col">
@@ -114,10 +120,18 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           <h1 className="text-sm font-semibold">{data.meta.title || "Untitled dashboard"}</h1>
           {dirty && <Badge variant="secondary">unsaved</Badge>}
         </div>
-        <Button size="sm" disabled={saving || !dirty} onClick={save}>
-          {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          Save
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={downloadHtml} title="Download the generated standalone HTML">
+            <Download className="size-4" /> HTML
+          </Button>
+          <Button variant="outline" size="sm" onClick={downloadJson} title="Download data.json">
+            <FileJson className="size-4" /> JSON
+          </Button>
+          <Button size="sm" disabled={saving || !dirty} onClick={save}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            Save
+          </Button>
+        </div>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">

@@ -23,6 +23,11 @@ spreadsheet-like editor lets you change a value and watch the preview update liv
 3. **Edit** (`/editor/[id]`) — tabs for KPIs · each chart · each table · Narrative ·
    Labels, with a live preview. Save writes `data.json` and re-hydrates.
 
+Both the verify and editor screens expose **Download HTML** (the generated, standalone
+hydrated file) and **Download JSON** (the `data.json` that produced it). The server
+already keeps both — plus `original.html` and `meta.json` — under `data/{id}/`; the
+buttons just save them (current editor state included) to your machine.
+
 ## Why a migration call, not a parser
 
 The model holds a strict "don't touch anything you don't have to" constraint and

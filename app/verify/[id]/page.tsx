@@ -3,8 +3,10 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, X, Loader2, ArrowLeft, PencilLine } from "lucide-react";
+import { Check, X, Loader2, ArrowLeft, PencilLine, Download, FileJson } from "lucide-react";
 import { toast } from "sonner";
+import { downloadText, slugify } from "@/lib/download";
+import type { DashboardData } from "@/lib/schema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -12,6 +14,7 @@ interface DashboardResponse {
   meta: { id: string; title: string; sourceFile: string; status: string; costUsd?: number };
   originalHtml: string;
   template: string;
+  data: DashboardData;
   hydrated: string;
 }
 
@@ -100,6 +103,28 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const base = slugify(record.meta.title || record.meta.sourceFile);
+              downloadText(`${base}.html`, record.hydrated, "text/html");
+            }}
+            title="Download the generated standalone HTML"
+          >
+            <Download className="size-4" /> HTML
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const base = slugify(record.meta.title || record.meta.sourceFile);
+              downloadText(`${base}.json`, JSON.stringify(record.data, null, 2), "application/json");
+            }}
+            title="Download data.json"
+          >
+            <FileJson className="size-4" /> JSON
+          </Button>
           <Button variant="outline" size="sm" disabled={busy} onClick={() => decide("rejected")}>
             <X className="size-4" /> Reject
           </Button>
