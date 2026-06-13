@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, X, ImagePlus, Send, Loader2, Wand2, Database, Check } from "lucide-react";
+import { MessageCircle, X, ImagePlus, Send, Loader2, Wand2, Sparkles, Check } from "lucide-react";
 import { toast } from "sonner";
 import type { DashboardData } from "@/lib/schema";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-export type ChatFocus = "ui" | "data";
+export type ChatFocus = "ui" | "editor";
 
 export interface ChatApplyResult {
   hydrated: string;
@@ -35,19 +35,26 @@ const COPY = {
     placeholder: "Describe the visual difference to fix…",
     empty:
       "Ask about visual differences between the original and the migrated dashboard, and attach a screenshot to point them out. I only discuss and fix these two documents.",
-    applyLabel: (data: boolean) => (data ? "Apply fix (updates data)" : "Apply fix"),
     successToast: "Fix applied — preview updated.",
   },
-  data: {
-    title: "Data assistant",
-    Icon: Database,
-    placeholder: "Ask me to fix values, formats, labels or rows…",
+  editor: {
+    title: "Dashboard assistant",
+    Icon: Sparkles,
+    placeholder: "Ask to change data, styling, or interactivity…",
     empty:
-      "Ask me to correct values, fix formats, relabel, or edit chart/table rows and narrative in this dashboard's data. I edit the data only, not the design.",
-    applyLabel: () => "Apply data change",
-    successToast: "Data updated.",
+      "Ask me to change this dashboard's data (values, formats, labels, rows) or its appearance and interactivity (charts, tooltips, hover, layout, responsiveness). I edit the data and the generated HTML while keeping the bindings intact.",
+    successToast: "Changes applied — preview updated.",
   },
 } as const;
+
+/** Reflect which artifact(s) a proposed change touches. */
+function applyLabel(m: { applied?: boolean; proposedTemplate?: string; proposedData?: string }): string {
+  if (m.applied) return "Applied";
+  const parts: string[] = [];
+  if (m.proposedTemplate) parts.push("UI");
+  if (m.proposedData) parts.push("data");
+  return parts.length ? `Apply ${parts.join(" + ")}` : "Apply";
+}
 
 export function DashboardChat({
   id,
@@ -62,7 +69,7 @@ export function DashboardChat({
   getData?: () => DashboardData | null;
 }) {
   const copy = COPY[focus];
-  const allowImages = focus === "ui";
+  const allowImages = true; // both focuses can use screenshots to point things out
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [images, setImages] = useState<string[]>([]);
@@ -224,7 +231,7 @@ export function DashboardChat({
                 ) : (
                   <Wand2 className="size-4" />
                 )}
-                {m.applied ? "Applied" : copy.applyLabel(Boolean(m.proposedData))}
+                {applyLabel(m)}
               </Button>
             )}
           </div>

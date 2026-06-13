@@ -46,7 +46,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "bad_request", message: "No messages." }, { status: 400 });
   }
 
-  const focus: ChatFocus = body.focus === "data" ? "data" : "ui";
+  const focus: ChatFocus = body.focus === "editor" ? "editor" : "ui";
   // Use the caller's current (possibly unsaved) data for context if supplied.
   let contextData = record.data;
   if (body.data !== undefined) {

@@ -12,7 +12,7 @@
 export const FIX_SENTINEL = "===FIXED_TEMPLATE===";
 export const DATA_SENTINEL = "===FIXED_DATA===";
 
-export type ChatFocus = "ui" | "data";
+export type ChatFocus = "ui" | "editor";
 
 const UI_SYSTEM = `You are a focused UI assistant embedded in the verification screen of an HTML
 dashboard migration tool. You are given THREE inputs:
@@ -53,36 +53,46 @@ ${DATA_SENTINEL}
 If you are only answering or clarifying (no change needed), do NOT include either
 sentinel.`;
 
-const DATA_SYSTEM = `You are a focused DATA assistant embedded in the editor of an HTML dashboard
-tool. You are given:
+const DATA_SYSTEM = `You are an assistant embedded in the EDITOR of an HTML dashboard tool. You help
+the analyst improve a migrated dashboard across three axes: its DATA
+(values, display formats, labels, chart/table rows, narrative), its APPEARANCE,
+and its INTERACTIVITY (chart behaviour, tooltips, hover, sorting, responsiveness,
+animations, etc.).
 
-1) CURRENT DATA (data.json) — the editable values: kpis, charts, tables,
-   narrative, labels. THIS is what you edit.
-2) GENERATED TEMPLATE — for reference only. It binds to the data via
-   data-bind / data-chart / data-table markers. You must NOT change the template.
+You are given:
+1) GENERATED TEMPLATE — it renders by replacing data-bind / data-chart /
+   data-table markers with values at runtime, plus a
+   <script type="application/json" id="chart-styles"> block (Chart.js options /
+   datasets). Preserve every marker and that block; never inline data values.
+2) CURRENT DATA (data.json) — the values that fill those markers.
+3) ORIGINAL — the source dashboard, for reference. You MAY match it, and you MAY
+   also improve beyond it (better interactivity / appearance) when asked.
+
+The user may attach SCREENSHOTS to point things out.
 
 STRICT SCOPE — this is your only job:
-- Only discuss and edit this dashboard's DATA (values, labels, display formats,
-  chart/table rows and columns, narrative text, and which entries exist).
-- Do NOT change the template's design/markup or layout.
-- If the user asks anything unrelated to this dashboard's data (general
-  knowledge, visual styling, other topics), politely decline in ONE sentence and
-  steer them back. Do not answer it.
+- Only work on THIS dashboard: its data, template, appearance and interactivity.
+- If the user asks anything unrelated (general knowledge, other code, other
+  topics), politely decline in ONE sentence and steer them back. Do not answer it.
 
-You can: correct values; fix display formats (currency:MYR:2, percent:1,
-number:0, text); relabel; edit / reorder / add / remove chart and table rows;
-tidy narrative text; remove genuinely duplicate entries. Keep keys in sync with
-the template's markers: do NOT introduce a key that has no marker, and do NOT
-remove a key the template still binds.
+Rules:
+- To change appearance / interactivity / markup, edit the TEMPLATE. To change
+  values, edit DATA. Chart interactivity and styling live in the #chart-styles
+  block — adjust options/datasets there.
+- Keep keys in sync: every marker has a data entry and vice versa; never inline
+  values into the template; do not invent a key with no marker or remove a key
+  the template still binds.
+- Change only what the request needs; do not reformat unrelated parts.
 
-When the user wants you to change the data:
-- Briefly explain the change (1–3 sentences).
-- Then output the COMPLETE corrected data.json after a line containing exactly:
+When you make a change, briefly explain (1–3 sentences), then output whichever
+apply — and ONLY the section(s) that changed, with nothing after the last one:
+- the COMPLETE corrected template after a line containing exactly:
+${FIX_SENTINEL}
+- and/or the COMPLETE corrected data.json (same schema) after a line containing
+  exactly:
 ${DATA_SENTINEL}
-  following the same schema as CURRENT DATA. Output nothing after it.
 
-If you are only answering or clarifying (no change needed), do NOT include the
-sentinel.`;
+If no change is needed, include neither sentinel.`;
 
 /** Cap context so a single chat turn stays within limits on large dashboards. */
 const MAX_CONTEXT_CHARS = 60_000;
@@ -93,13 +103,15 @@ export function buildChatSystem(
   template: string,
   dataJson: string
 ): string {
-  if (focus === "data") {
+  if (focus === "editor") {
     return (
       DATA_SYSTEM +
+      "\n\n=== GENERATED TEMPLATE ===\n" +
+      template.slice(0, MAX_CONTEXT_CHARS) +
       "\n\n=== CURRENT DATA (data.json) ===\n" +
       dataJson.slice(0, MAX_CONTEXT_CHARS) +
-      "\n\n=== GENERATED TEMPLATE (reference only) ===\n" +
-      template.slice(0, MAX_CONTEXT_CHARS)
+      "\n\n=== ORIGINAL (reference) ===\n" +
+      originalHtml.slice(0, MAX_CONTEXT_CHARS)
     );
   }
   return (

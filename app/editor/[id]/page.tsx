@@ -417,7 +417,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
       <DashboardChat
         id={id}
-        focus="data"
+        focus="editor"
         getData={() => data}
         onApplied={(r) => {
           setTemplate(r.template);

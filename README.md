@@ -28,13 +28,17 @@ spreadsheet-like editor lets you change a value and watch the preview update liv
    rewrites the document is rejected, never persisted). Its model is set by
    `DEEPSEEK_CHAT_MODEL` (default `deepseek-v4-flash`).
 3. **Edit** (`/editor/[id]`) — tabs for KPIs · each chart · each table · Narrative ·
-   Labels, with a live preview. Save writes `data.json` and re-hydrates. A second
-   **data assistant** chat bubble lives here, scoped to the *data* (values, formats,
-   labels, rows, narrative) rather than the UI — it proposes a corrected `data.json`
-   you Apply, sanity-checked against the template so keys stay in sync.
+   Labels, with a live preview. Save writes `data.json` and re-hydrates. A combined
+   **dashboard assistant** chat bubble lives here: it works on the *data* (values,
+   formats, labels, rows, narrative) **and** the generated HTML's appearance and
+   interactivity (chart behaviour, tooltips, hover, layout, responsiveness — chart
+   styling/options live in the `#chart-styles` block), and may both match the
+   original and improve beyond it. It proposes a corrected template and/or
+   `data.json` you Apply, sanity-checked so bindings and keys stay in sync.
 
 Both chat bubbles share one component (`components/dashboard-chat.tsx`) and route
-(`/api/dashboards/[id]/chat`) with a `focus` of `"ui"` (verify) or `"data"` (editor).
+(`/api/dashboards/[id]/chat`) with a `focus` of `"ui"` (verify — strict parity vs.
+the original) or `"editor"` (combined data + UI/interactivity).
 
 Both the verify and editor screens expose **Download HTML** (the generated, standalone
 hydrated file) and **Download JSON** (the `data.json` that produced it). The server
