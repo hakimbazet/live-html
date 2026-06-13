@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type OpenAI from "openai";
 import { getDeepseek, CHAT_MODEL, CHAT_MAX_TOKENS, hasDeepseekKey, withBackoff } from "@/lib/deepseek";
-import { buildChatSystem, parseChatReply } from "@/lib/chat-prompt";
+import { buildChatSystem, parseChatReply, type ChatFocus } from "@/lib/chat-prompt";
 import { runSanityChecks } from "@/lib/sanity";
 import { DataSchema } from "@/lib/schema";
 import { hydrate } from "@/lib/loader";
@@ -18,6 +18,9 @@ interface ChatTurn {
 
 interface ChatBody {
   messages: ChatTurn[];
+  focus?: ChatFocus;
+  /** Current (possibly unsaved) data for context, e.g. the editor's state. */
+  data?: unknown;
 }
 
 /** POST: one chat turn scoped to the original vs. generated template. */
@@ -43,13 +46,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "bad_request", message: "No messages." }, { status: 400 });
   }
 
+  const focus: ChatFocus = body.focus === "data" ? "data" : "ui";
+  // Use the caller's current (possibly unsaved) data for context if supplied.
+  let contextData = record.data;
+  if (body.data !== undefined) {
+    const p = DataSchema.safeParse(body.data);
+    if (p.success) contextData = p.data;
+  }
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
       role: "system",
       content: buildChatSystem(
+        focus,
         record.originalHtml,
         record.template,
-        JSON.stringify(record.data, null, 2)
+        JSON.stringify(contextData, null, 2)
       ),
     },
   ];

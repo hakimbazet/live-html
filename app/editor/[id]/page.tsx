@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DashboardChat } from "@/components/dashboard-chat";
 
 type Cell = string | number | boolean | null;
 
@@ -413,6 +414,17 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DashboardChat
+        id={id}
+        focus="data"
+        getData={() => data}
+        onApplied={(r) => {
+          setTemplate(r.template);
+          setData(r.data);
+          setDirty(false);
+        }}
+      />
     </main>
   );
 }

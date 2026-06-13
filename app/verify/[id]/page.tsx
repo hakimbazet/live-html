@@ -9,7 +9,7 @@ import { downloadText, slugify } from "@/lib/download";
 import type { DashboardData } from "@/lib/schema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { VerifyChat } from "@/components/verify-chat";
+import { DashboardChat } from "@/components/dashboard-chat";
 
 interface DashboardResponse {
   meta: { id: string; title: string; sourceFile: string; status: string; costUsd?: number };
@@ -166,9 +166,10 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
         </figure>
       </div>
 
-      <VerifyChat
+      <DashboardChat
         id={id}
-        onApplied={(hydrated) => setRecord((r) => (r ? { ...r, hydrated } : r))}
+        focus="ui"
+        onApplied={(r) => setRecord((rec) => (rec ? { ...rec, hydrated: r.hydrated } : rec))}
       />
     </main>
   );

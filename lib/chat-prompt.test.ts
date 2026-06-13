@@ -27,6 +27,13 @@ describe("parseChatReply", () => {
     expect(r.proposedData).toBe('{"version":1}');
   });
 
+  it("extracts data-only proposals (editor focus, no template)", () => {
+    const r = parseChatReply(`Relabeled the KPI.\n${DATA_SENTINEL}\n{"version":1}`);
+    expect(r.reply).toBe("Relabeled the KPI.");
+    expect(r.proposedTemplate).toBeUndefined();
+    expect(r.proposedData).toBe('{"version":1}');
+  });
+
   it("strips markdown fences around the template and data", () => {
     const r = parseChatReply(
       `fix\n${FIX_SENTINEL}\n\`\`\`html\n<html>t</html>\n\`\`\`\n${DATA_SENTINEL}\n\`\`\`json\n{"version":1}\n\`\`\``

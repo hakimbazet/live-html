@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, X, ImagePlus, Send, Loader2, Wand2, Check } from "lucide-react";
+import { MessageCircle, X, ImagePlus, Send, Loader2, Wand2, Database, Check } from "lucide-react";
 import { toast } from "sonner";
+import type { DashboardData } from "@/lib/schema";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+
+export type ChatFocus = "ui" | "data";
+
+export interface ChatApplyResult {
+  hydrated: string;
+  template: string;
+  data: DashboardData;
+}
 
 interface ChatMsg {
   role: "user" | "assistant";
@@ -19,13 +28,41 @@ interface ChatMsg {
 const MAX_IMAGES = 4;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
-export function VerifyChat({
+const COPY = {
+  ui: {
+    title: "Fix assistant",
+    Icon: Wand2,
+    placeholder: "Describe the visual difference to fix…",
+    empty:
+      "Ask about visual differences between the original and the migrated dashboard, and attach a screenshot to point them out. I only discuss and fix these two documents.",
+    applyLabel: (data: boolean) => (data ? "Apply fix (updates data)" : "Apply fix"),
+    successToast: "Fix applied — preview updated.",
+  },
+  data: {
+    title: "Data assistant",
+    Icon: Database,
+    placeholder: "Ask me to fix values, formats, labels or rows…",
+    empty:
+      "Ask me to correct values, fix formats, relabel, or edit chart/table rows and narrative in this dashboard's data. I edit the data only, not the design.",
+    applyLabel: () => "Apply data change",
+    successToast: "Data updated.",
+  },
+} as const;
+
+export function DashboardChat({
   id,
+  focus,
   onApplied,
+  getData,
 }: {
   id: string;
-  onApplied: (hydrated: string) => void;
+  focus: ChatFocus;
+  onApplied: (result: ChatApplyResult) => void;
+  /** Supplies the caller's current (possibly unsaved) data for context. */
+  getData?: () => DashboardData | null;
 }) {
+  const copy = COPY[focus];
+  const allowImages = focus === "ui";
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [images, setImages] = useState<string[]>([]);
@@ -52,9 +89,7 @@ export function VerifyChat({
       }
       const reader = new FileReader();
       reader.onload = () =>
-        setImages((prev) =>
-          prev.length >= MAX_IMAGES ? prev : [...prev, String(reader.result)]
-        );
+        setImages((prev) => (prev.length >= MAX_IMAGES ? prev : [...prev, String(reader.result)]));
       reader.readAsDataURL(file);
     }
   };
@@ -74,6 +109,8 @@ export function VerifyChat({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          focus,
+          data: getData?.() ?? undefined,
           messages: next.map((m) => ({ role: m.role, text: m.text, images: m.images })),
         }),
       });
@@ -110,9 +147,9 @@ export function VerifyChat({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.issues?.join("; ") ?? json.message ?? "Apply failed.");
-      onApplied(json.hydrated);
+      onApplied(json as ChatApplyResult);
       setMessages((m) => m.map((x, i) => (i === idx ? { ...x, applied: true } : x)));
-      toast.success("Fix applied — preview updated.");
+      toast.success(copy.successToast);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Apply failed.");
     } finally {
@@ -126,7 +163,7 @@ export function VerifyChat({
         onClick={() => setOpen(true)}
         className="fixed bottom-5 right-5 z-40 size-12 rounded-full shadow-lg"
         size="icon"
-        aria-label="Open fix assistant"
+        aria-label={`Open ${copy.title}`}
       >
         <MessageCircle className="size-5" />
       </Button>
@@ -137,8 +174,8 @@ export function VerifyChat({
     <div className="bg-background fixed bottom-5 right-5 z-40 flex h-[32rem] w-[24rem] max-w-[calc(100vw-2.5rem)] flex-col rounded-xl border shadow-2xl">
       <div className="flex items-center justify-between border-b px-3 py-2">
         <div className="flex items-center gap-2">
-          <Wand2 className="text-primary size-4" />
-          <span className="text-sm font-semibold">Fix assistant</span>
+          <copy.Icon className="text-primary size-4" />
+          <span className="text-sm font-semibold">{copy.title}</span>
         </div>
         <Button variant="ghost" size="icon" className="size-7" onClick={() => setOpen(false)}>
           <X className="size-4" />
@@ -148,9 +185,7 @@ export function VerifyChat({
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
         {messages.length === 0 && (
           <p className="text-muted-foreground text-xs">
-            Ask about visual differences between the original and the migrated dashboard,
-            and attach a screenshot to point them out. I can only discuss and fix these two
-            documents. When I propose a fix, you&apos;ll get an{" "}
+            {copy.empty} When I propose a change, you&apos;ll get an{" "}
             <span className="font-medium">Apply</span> button.
           </p>
         )}
@@ -171,12 +206,7 @@ export function VerifyChat({
               <div className="flex flex-wrap justify-end gap-1">
                 {m.images.map((src, j) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={j}
-                    src={src}
-                    alt="attachment"
-                    className="size-16 rounded border object-cover"
-                  />
+                  <img key={j} src={src} alt="attachment" className="size-16 rounded border object-cover" />
                 ))}
               </div>
             )}
@@ -194,11 +224,7 @@ export function VerifyChat({
                 ) : (
                   <Wand2 className="size-4" />
                 )}
-                {m.applied
-                  ? "Applied"
-                  : m.proposedData
-                    ? "Apply fix (updates data)"
-                    : "Apply fix"}
+                {m.applied ? "Applied" : copy.applyLabel(Boolean(m.proposedData))}
               </Button>
             )}
           </div>
@@ -211,7 +237,7 @@ export function VerifyChat({
         <div ref={endRef} />
       </div>
 
-      {images.length > 0 && (
+      {allowImages && images.length > 0 && (
         <div className="flex flex-wrap gap-1 border-t px-3 py-2">
           {images.map((src, i) => (
             <div key={i} className="relative">
@@ -230,27 +256,31 @@ export function VerifyChat({
       )}
 
       <div className="flex items-end gap-2 border-t p-2">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            addImages(e.target.files);
-            e.target.value = "";
-          }}
-        />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-9 shrink-0"
-          disabled={images.length >= MAX_IMAGES}
-          onClick={() => fileRef.current?.click()}
-          aria-label="Attach screenshot"
-        >
-          <ImagePlus className="size-4" />
-        </Button>
+        {allowImages && (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                addImages(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9 shrink-0"
+              disabled={images.length >= MAX_IMAGES}
+              onClick={() => fileRef.current?.click()}
+              aria-label="Attach screenshot"
+            >
+              <ImagePlus className="size-4" />
+            </Button>
+          </>
+        )}
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -261,7 +291,7 @@ export function VerifyChat({
             }
           }}
           rows={1}
-          placeholder="Describe the difference to fix…"
+          placeholder={copy.placeholder}
           className="max-h-28 min-h-9 resize-none py-2"
         />
         <Button
