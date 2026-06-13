@@ -127,9 +127,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           <Button variant="outline" size="sm" onClick={downloadJson} title="Download data.json">
             <FileJson className="size-4" /> JSON
           </Button>
-          <Button size="sm" disabled={saving || !dirty} onClick={save}>
+          <Button size="sm" disabled={saving} onClick={save}>
             {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-            Save
+            {dirty ? "Save" : "Saved"}
           </Button>
         </div>
       </header>
